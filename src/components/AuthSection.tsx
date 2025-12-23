@@ -14,6 +14,7 @@ import TermsModal from '@/components/TermsModal';
 import VerificationWaiting from '@/components/VerificationWaiting';
 import GeolocationModal from '@/components/GeolocationModal';
 import { supabase } from '@/lib/supabase';
+import { getOAuthRedirectUrl } from '@/utils/platform';
 
 const AuthSection = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -149,9 +150,9 @@ const AuthSection = () => {
 
         // Navigate to appropriate dashboard based on user type
         if (actualUserType === 'vet' || actualUserType === 'laboratory') {
-          navigate('/'); // Vet goes to home page
+          navigate('/vet-dashboard'); // Vet goes to trouver client
         } else {
-          navigate('/'); // Client goes to home page
+          navigate('/find-laboratory'); // Client goes to trouver vet
         }
       } else {
         toast({
@@ -275,7 +276,7 @@ const AuthSection = () => {
                             const { error } = await supabase.auth.signInWithOAuth({
                               provider: 'google',
                               options: {
-                                redirectTo: `${window.location.origin}/#/auth/callback`
+                                redirectTo: getOAuthRedirectUrl()
                               }
                             });
                             if (error) {
@@ -307,7 +308,7 @@ const AuthSection = () => {
                             const { error } = await supabase.auth.signInWithOAuth({
                               provider: 'facebook',
                               options: {
-                                redirectTo: `${window.location.origin}/#/auth/callback`
+                                redirectTo: getOAuthRedirectUrl()
                               }
                             });
                             if (error) {
@@ -390,7 +391,7 @@ const AuthSection = () => {
                             const { error } = await supabase.auth.signInWithOAuth({
                               provider: 'google',
                               options: {
-                                redirectTo: `${window.location.origin}/#/auth/callback`
+                                redirectTo: getOAuthRedirectUrl()
                               }
                             });
                             if (error) {
@@ -422,7 +423,7 @@ const AuthSection = () => {
                             const { error } = await supabase.auth.signInWithOAuth({
                               provider: 'facebook',
                               options: {
-                                redirectTo: `${window.location.origin}/#/auth/callback`
+                                redirectTo: getOAuthRedirectUrl()
                               }
                             });
                             if (error) {

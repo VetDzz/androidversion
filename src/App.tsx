@@ -82,7 +82,7 @@ const App = () => {
               <Sonner />
               <HashRouter>
                 <Routes>
-                  <Route path="/" element={<Index />} />
+                  <Route path="/" element={<AuthPage />} />
                   <Route path="/auth" element={<AuthPage />} />
                   <Route path="/auth/callback" element={<AuthCallback />} />
                   <Route path="/oauth-complete" element={<OAuthCompleteSignup />} />

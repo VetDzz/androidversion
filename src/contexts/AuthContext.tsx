@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase, signIn, signUp, signOut, getCurrentUser, createClientProfile, createVetProfile, createNotification, subscribeToUserChanges, checkUserExists } from '@/lib/supabase';
 import { getAuthRedirectUrl } from '@/utils/urlConfig';
-import { setupFCMTokenListener, isAndroidApp } from '@/utils/pushNotifications';
+import { initPushNotifications, isNativeApp } from '@/utils/platform';
 
 export type UserType = 'client' | 'vet';
 
@@ -230,9 +230,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser(userData);
         localStorage.setItem('user', JSON.stringify(userData));
 
-        // Setup FCM token for push notifications (Android app)
-        if (isAndroidApp()) {
-          setupFCMTokenListener(data.user.id, actualUserType);
+        // Initialize push notifications for native app
+        if (isNativeApp()) {
+          initPushNotifications(data.user.id, actualUserType);
         }
 
         return { success: true, userType: actualUserType };
@@ -423,9 +423,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setUser(userData);
           localStorage.setItem('user', JSON.stringify(userData));
 
-          // Setup FCM token for push notifications (Android app)
-          if (isAndroidApp()) {
-            setupFCMTokenListener(session.user.id, userType);
+          // Initialize push notifications for native app
+          if (isNativeApp()) {
+            initPushNotifications(session.user.id, userType);
           }
 
         } else if (event === 'SIGNED_OUT') {

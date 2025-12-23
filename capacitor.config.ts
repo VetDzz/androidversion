@@ -5,15 +5,17 @@ const config: CapacitorConfig = {
   appName: 'VetDz',
   webDir: 'dist',
   plugins: {
-    CapacitorHttp: {
-      enabled: true
-    }
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert'],
+    },
   },
   // Deep linking configuration for OAuth
   server: {
     androidScheme: 'https',
-    hostname: 'vetdz.app'
-  }
+  },
+  android: {
+    allowMixedContent: true,
+  },
 };
 
 export default config;
