@@ -74,6 +74,7 @@ const FindVetMobile = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [gettingLocation, setGettingLocation] = useState(false);
   const [mapCenter, setMapCenter] = useState<[number, number]>([35.5559, 6.1743]);
+  const [showLocationError, setShowLocationError] = useState(false);
   const mapRef = useRef<L.Map | null>(null);
 
   useEffect(() => {
@@ -103,6 +104,8 @@ const FindVetMobile = () => {
 
   const getUserLocation = () => {
     setGettingLocation(true);
+    setShowLocationError(false);
+    
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -121,19 +124,18 @@ const FindVetMobile = () => {
         (error) => {
           console.log('Location error:', error);
           setGettingLocation(false);
-          // Use default location
-          setUserLocation({ lat: 35.5559, lng: 6.1743 });
+          setShowLocationError(true);
+          // Use default location but still fetch vets
+          const defaultLoc = { lat: 35.5559, lng: 6.1743 };
+          setUserLocation(defaultLoc);
+          setMapCenter([defaultLoc.lat, defaultLoc.lng]);
           fetchVets();
-          toast({
-            title: "Position par défaut",
-            description: "Impossible d'obtenir votre position",
-            variant: "destructive"
-          });
         },
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     } else {
       setGettingLocation(false);
+      setShowLocationError(true);
       setUserLocation({ lat: 35.5559, lng: 6.1743 });
       fetchVets();
     }
@@ -262,6 +264,41 @@ const FindVetMobile = () => {
   return (
     <MobileLayout>
       <div className="px-3">
+        {/* Location Error Popup */}
+        {showLocationError && (
+          <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center shrink-0">
+                <MapPin className="w-4 h-4 text-orange-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-orange-800">Localisation désactivée</p>
+                <p className="text-xs text-orange-600 mt-0.5">
+                  Veuillez activer la localisation dans les paramètres de votre téléphone pour voir les vétérinaires près de vous.
+                </p>
+                <div className="flex gap-2 mt-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="h-7 text-xs border-orange-300 text-orange-700"
+                    onClick={getUserLocation}
+                  >
+                    <RefreshCw className="w-3 h-3 mr-1" /> Réessayer
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="h-7 text-xs text-orange-600"
+                    onClick={() => setShowLocationError(false)}
+                  >
+                    Fermer
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="mb-3">
           <h1 className="text-lg font-bold text-gray-900">Trouver un Vétérinaire</h1>

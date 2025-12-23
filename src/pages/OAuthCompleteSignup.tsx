@@ -108,7 +108,8 @@ const OAuthCompleteSignup = () => {
           description: "Bienvenue de retour sur VetDZ !",
         });
 
-        window.location.href = '/#/';
+        // Client goes to find vets
+        window.location.href = '/#/find-laboratory';
         return;
       }
 
@@ -146,7 +147,8 @@ const OAuthCompleteSignup = () => {
           localStorage.setItem(`userType_${user.id}`, 'client');
           localStorage.setItem(`userTypeTime_${user.id}`, Date.now().toString());
           
-          window.location.href = '/#/';
+          // Client goes to find vets
+          window.location.href = '/#/find-laboratory';
           return;
         } else if (error.code === '42501') {
           toast({
@@ -178,7 +180,8 @@ const OAuthCompleteSignup = () => {
         description: "Bienvenue sur VetDZ !",
       });
 
-      window.location.href = '/#/';
+      // Client goes to find vets
+      window.location.href = '/#/find-laboratory';
     } catch (error: any) {
       console.error('❌ Catch error:', error);
       toast({
@@ -237,7 +240,8 @@ const OAuthCompleteSignup = () => {
         description: "Bienvenue sur VetDZ !",
       });
 
-      window.location.href = '/#/vet-home';
+      // Vet goes to find clients
+      window.location.href = '/#/vet-dashboard?tab=clients';
     } catch (error) {
     } finally {
       setIsLoading(false);

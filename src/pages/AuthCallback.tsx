@@ -119,12 +119,14 @@ const AuthCallback = () => {
             description: "Bienvenue sur VetDZ !",
           });
           
-          // Redirect based on profile type
+          // Redirect based on profile type - use mobile-friendly routes
           setTimeout(() => {
             if (hasVetProfile) {
-              window.location.href = '/#/vet-home';
+              // Vet goes to find clients
+              window.location.href = '/#/vet-dashboard?tab=clients';
             } else {
-              window.location.href = '/#/';
+              // Client goes to find vets
+              window.location.href = '/#/find-laboratory';
             }
           }, 500);
           return;
