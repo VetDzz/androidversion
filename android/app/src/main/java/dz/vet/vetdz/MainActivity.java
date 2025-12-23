@@ -55,47 +55,75 @@ public class MainActivity extends BridgeActivity {
             // Handle OAuth callback from custom scheme (dz.vet.vetdz://auth/callback)
             if (url.startsWith("dz.vet.vetdz://")) {
                 Log.d(TAG, "Custom scheme OAuth callback");
-                // Extract the fragment/query from the URL
                 String fragment = data.getFragment();
                 String query = data.getQuery();
                 
+                // Wait longer for WebView to be fully ready
                 new Handler(Looper.getMainLooper()).postDelayed(() -> {
                     try {
                         WebView webView = getBridge().getWebView();
                         if (webView != null) {
-                            String js;
+                            String targetUrl;
+                            
                             if (fragment != null && fragment.contains("access_token")) {
-                                // Has hash params (implicit flow)
-                                js = "javascript:(function() {" +
-                                    "window.location.hash = '#" + fragment + "';" +
-                                    "window.dispatchEvent(new HashChangeEvent('hashchange'));" +
-                                    "console.log('OAuth hash set');" +
-                                    "})()";
+                                // Implicit flow - has access_token in fragment
+                                targetUrl = "/#/auth/callback#" + fragment;
+                            } else if (query != null && query.contains("access_token")) {
+                                // Access token in query
+                                targetUrl = "/#/auth/callback#" + query.replace("&", "&");
                             } else if (query != null && query.contains("code=")) {
-                                // Has query params (PKCE flow)
-                                js = "javascript:(function() {" +
-                                    "window.location.href = '/#/auth/callback?" + query + "';" +
-                                    "console.log('OAuth code redirect');" +
-                                    "})()";
+                                // PKCE flow - has code in query
+                                targetUrl = "/#/auth/callback?" + query;
+                            } else if (query != null) {
+                                // Other query params
+                                targetUrl = "/#/auth/callback?" + query;
+                            } else if (fragment != null) {
+                                // Other fragment
+                                targetUrl = "/#/auth/callback#" + fragment;
                             } else {
-                                // Just navigate to callback
-                                js = "javascript:window.location.href = '/#/auth/callback';";
+                                // Fallback
+                                targetUrl = "/#/auth/callback";
                             }
+                            
+                            Log.d(TAG, "Navigating to: " + targetUrl);
+                            String js = "javascript:window.location.href = '" + targetUrl + "';";
                             webView.evaluateJavascript(js, null);
-                            Log.d(TAG, "OAuth callback processed");
                         }
                     } catch (Exception e) {
                         Log.e(TAG, "Error processing OAuth callback", e);
                     }
-                }, 500);
+                }, 1000);
                 return;
             }
             
-            // Handle other deep links (https scheme)
-            if (url.contains("auth/v1/callback") || url.contains("access_token") || url.contains("code=")) {
+            // Handle https scheme OAuth callbacks
+            if (url.contains("access_token") || url.contains("code=")) {
                 new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                    navigateToUrl(url);
-                }, 500);
+                    try {
+                        WebView webView = getBridge().getWebView();
+                        if (webView != null) {
+                            // Extract tokens and navigate to auth callback
+                            String targetUrl;
+                            if (url.contains("#access_token") || url.contains("#/auth/callback#access_token")) {
+                                int tokenStart = url.indexOf("access_token");
+                                String tokenPart = url.substring(tokenStart);
+                                targetUrl = "/#/auth/callback#" + tokenPart;
+                            } else if (url.contains("?code=")) {
+                                int codeStart = url.indexOf("?code=");
+                                String codePart = url.substring(codeStart + 1);
+                                targetUrl = "/#/auth/callback?" + codePart;
+                            } else {
+                                targetUrl = "/#/auth/callback";
+                            }
+                            
+                            Log.d(TAG, "HTTPS OAuth navigating to: " + targetUrl);
+                            String js = "javascript:window.location.href = '" + targetUrl + "';";
+                            webView.evaluateJavascript(js, null);
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error navigating OAuth", e);
+                    }
+                }, 1000);
             }
         }
     }
