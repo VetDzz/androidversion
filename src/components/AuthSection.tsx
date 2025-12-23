@@ -152,7 +152,7 @@ const AuthSection = () => {
         if (actualUserType === 'vet' || actualUserType === 'laboratory') {
           navigate('/vet-dashboard'); // Vet goes to trouver client
         } else {
-          navigate('/find-laboratory'); // Client goes to trouver vet
+          navigate('/client-dashboard'); // Client goes to dashboard (safer than map page)
         }
       } else {
         toast({

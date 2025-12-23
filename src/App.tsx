@@ -9,6 +9,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
+import SmartHome from "./pages/SmartHome";
 import NotFound from "./pages/NotFound";
 import FireCatProject from "./pages/FireCatProject";
 import SportRetailProject from "./pages/SportRetailProject";
@@ -82,7 +83,7 @@ const App = () => {
               <Sonner />
               <HashRouter>
                 <Routes>
-                  <Route path="/" element={<AuthPage />} />
+                  <Route path="/" element={<SmartHome />} />
                   <Route path="/auth" element={<AuthPage />} />
                   <Route path="/auth/callback" element={<AuthCallback />} />
                   <Route path="/oauth-complete" element={<OAuthCompleteSignup />} />
