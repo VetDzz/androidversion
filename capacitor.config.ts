@@ -9,12 +9,22 @@ const config: CapacitorConfig = {
       presentationOptions: ['badge', 'sound', 'alert'],
     },
   },
-  // Deep linking configuration for OAuth
+  // Server configuration
   server: {
     androidScheme: 'https',
+    // Allow navigation to OAuth providers
+    allowNavigation: [
+      'https://plwfbeqtupboeerqiplw.supabase.co/*',
+      'https://accounts.google.com/*',
+      'https://www.facebook.com/*',
+      'https://m.facebook.com/*',
+      'https://vetdz.netlify.app/*',
+    ],
   },
   android: {
     allowMixedContent: true,
+    // Handle OAuth redirects
+    appendUserAgent: 'VetDzApp',
   },
 };
 

@@ -1,5 +1,7 @@
 package dz.vet.vetdz;
 
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -17,8 +19,18 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
+        // Handle deep link if app was opened via URL
+        handleIntent(getIntent());
+        
         // Get FCM token
         initializeFCM();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleIntent(intent);
     }
 
     @Override
@@ -29,6 +41,86 @@ public class MainActivity extends BridgeActivity {
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                 injectFCMToken(fcmToken);
             }, 1000);
+        }
+    }
+
+    private void handleIntent(Intent intent) {
+        if (intent == null) return;
+        
+        Uri data = intent.getData();
+        if (data != null) {
+            String url = data.toString();
+            Log.d(TAG, "Deep link received: " + url);
+            
+            // Handle OAuth callback from custom scheme (dz.vet.vetdz://auth/callback)
+            if (url.startsWith("dz.vet.vetdz://")) {
+                Log.d(TAG, "Custom scheme OAuth callback");
+                // Extract the fragment/query from the URL
+                String fragment = data.getFragment();
+                String query = data.getQuery();
+                
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    try {
+                        WebView webView = getBridge().getWebView();
+                        if (webView != null) {
+                            String js;
+                            if (fragment != null && fragment.contains("access_token")) {
+                                // Has hash params (implicit flow)
+                                js = "javascript:(function() {" +
+                                    "window.location.hash = '#" + fragment + "';" +
+                                    "window.dispatchEvent(new HashChangeEvent('hashchange'));" +
+                                    "console.log('OAuth hash set');" +
+                                    "})()";
+                            } else if (query != null && query.contains("code=")) {
+                                // Has query params (PKCE flow)
+                                js = "javascript:(function() {" +
+                                    "window.location.href = '/#/auth/callback?" + query + "';" +
+                                    "console.log('OAuth code redirect');" +
+                                    "})()";
+                            } else {
+                                // Just navigate to callback
+                                js = "javascript:window.location.href = '/#/auth/callback';";
+                            }
+                            webView.evaluateJavascript(js, null);
+                            Log.d(TAG, "OAuth callback processed");
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error processing OAuth callback", e);
+                    }
+                }, 500);
+                return;
+            }
+            
+            // Handle other deep links (https scheme)
+            if (url.contains("auth/v1/callback") || url.contains("access_token") || url.contains("code=")) {
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    navigateToUrl(url);
+                }, 500);
+            }
+        }
+    }
+
+    private void navigateToUrl(String url) {
+        try {
+            WebView webView = getBridge().getWebView();
+            if (webView != null) {
+                // Extract the hash/query params and navigate
+                String js;
+                if (url.contains("#")) {
+                    // Has hash params (implicit flow)
+                    String hash = url.substring(url.indexOf("#"));
+                    js = "javascript:window.location.hash = '" + hash + "'; window.dispatchEvent(new HashChangeEvent('hashchange'));";
+                } else if (url.contains("?")) {
+                    // Has query params (PKCE flow)
+                    js = "javascript:window.location.href = '" + url + "';";
+                } else {
+                    js = "javascript:window.location.href = '" + url + "';";
+                }
+                webView.evaluateJavascript(js, null);
+                Log.d(TAG, "Navigated to OAuth callback");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error navigating to URL", e);
         }
     }
 
