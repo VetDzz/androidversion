@@ -14,23 +14,25 @@ export const isNativeApp = (): boolean => {
 // Check if running in Android WebView
 export const isAndroidWebView = (): boolean => {
   try {
-    return !!(window as any).AndroidBridge || 
-           navigator.userAgent.includes('VetDzApp') ||
-           (window as any).Capacitor?.isNativePlatform?.();
+    // Check for Capacitor
+    if ((window as any).Capacitor?.isNativePlatform?.()) return true;
+    // Check user agent for Android WebView
+    const ua = navigator.userAgent.toLowerCase();
+    return ua.includes('android') && (ua.includes('wv') || ua.includes('webview'));
   } catch {
     return false;
   }
 };
 
-// Get FCM token from Android app
+// Get FCM token from localStorage (set by Android app)
 export const getFCMToken = (): string | null => {
   try {
-    // Try to get token from Android bridge
-    if ((window as any).AndroidBridge?.getFCMToken) {
-      return (window as any).AndroidBridge.getFCMToken();
+    const token = localStorage.getItem('fcm_token');
+    if (token && token.length > 20) {
+      console.log('FCM token found:', token.substring(0, 20) + '...');
+      return token;
     }
-    // Try localStorage (set by Android app)
-    return localStorage.getItem('fcm_token');
+    return null;
   } catch {
     return null;
   }
@@ -43,7 +45,14 @@ export const saveFCMToken = async (
   token: string
 ): Promise<boolean> => {
   try {
+    if (!token || token.length < 20) {
+      console.log('Invalid FCM token');
+      return false;
+    }
+
     const table = userType === 'client' ? 'client_profiles' : 'vet_profiles';
+    
+    console.log(`Saving FCM token to ${table} for user ${userId}`);
     
     const { error } = await supabase
       .from(table)
@@ -139,9 +148,12 @@ export const listenForFCMToken = (
   userId: string,
   userType: 'client' | 'vet'
 ) => {
+  console.log('Setting up FCM token listener for', userType, userId);
+  
   // Listen for token from Android WebView
-  window.addEventListener('fcmTokenReceived', async (event: any) => {
+  const handleToken = async (event: any) => {
     const token = event.detail?.token;
+    console.log('FCM token event received:', token?.substring(0, 20) + '...');
     if (token) {
       localStorage.setItem('fcm_token', token);
       const enabled = localStorage.getItem('notifications_enabled') !== 'false';
@@ -149,16 +161,40 @@ export const listenForFCMToken = (
         await saveFCMToken(userId, userType, token);
       }
     }
-  });
+  };
 
-  // Also check if token is already available
-  const existingToken = getFCMToken();
-  if (existingToken) {
-    const enabled = localStorage.getItem('notifications_enabled') !== 'false';
-    if (enabled) {
-      saveFCMToken(userId, userType, existingToken);
+  window.addEventListener('fcmTokenReceived', handleToken);
+
+  // Also check if token is already available (with retry)
+  const checkExistingToken = async () => {
+    const existingToken = getFCMToken();
+    if (existingToken) {
+      console.log('Existing FCM token found');
+      const enabled = localStorage.getItem('notifications_enabled') !== 'false';
+      if (enabled) {
+        await saveFCMToken(userId, userType, existingToken);
+      }
+    } else {
+      // Retry after 3 seconds
+      setTimeout(async () => {
+        const retryToken = getFCMToken();
+        if (retryToken) {
+          console.log('FCM token found on retry');
+          const enabled = localStorage.getItem('notifications_enabled') !== 'false';
+          if (enabled) {
+            await saveFCMToken(userId, userType, retryToken);
+          }
+        }
+      }, 3000);
     }
-  }
+  };
+
+  checkExistingToken();
+
+  // Return cleanup function
+  return () => {
+    window.removeEventListener('fcmTokenReceived', handleToken);
+  };
 };
 
 // Request notification permission (for web)

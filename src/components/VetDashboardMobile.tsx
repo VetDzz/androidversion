@@ -226,7 +226,7 @@ const VetDashboardMobile = () => {
 
         {/* Clients Tab - Search and list clients */}
         {activeTab === 'clients' && (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {/* Search */}
             <div className="flex gap-2">
               <Input
@@ -234,47 +234,43 @@ const VetDashboardMobile = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && searchClients()}
-                className="flex-1"
+                className="flex-1 h-9 text-sm"
               />
-              <Button onClick={searchClients} size="icon" className="bg-blue-600">
+              <Button onClick={searchClients} size="icon" className="bg-blue-600 h-9 w-9">
                 <Search className="w-4 h-4" />
               </Button>
             </div>
 
-            {/* Clients List */}
+            {/* Clients List - Compact */}
             {loading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <div className="text-center py-6">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
               </div>
             ) : clients.length === 0 ? (
               <Card>
-                <CardContent className="py-12 text-center">
-                  <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500 font-medium">Aucun client trouvé</p>
-                  <p className="text-gray-400 text-sm mt-1">Essayez une autre recherche</p>
+                <CardContent className="py-8 text-center">
+                  <Users className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                  <p className="text-gray-500 text-sm">Aucun client trouvé</p>
                 </CardContent>
               </Card>
             ) : (
               clients.map((client) => (
                 <Card key={client.id}>
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-center">
+                  <CardContent className="p-3">
+                    <div className="flex justify-between items-center gap-2">
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-gray-900 truncate">{client.full_name}</h4>
-                        <p className="text-sm text-gray-500 truncate">{client.email}</p>
+                        <h4 className="font-medium text-sm text-gray-900 truncate">{client.full_name}</h4>
+                        <p className="text-xs text-gray-500 truncate">{client.email}</p>
                         {client.phone && (
-                          <p className="text-sm text-gray-500 flex items-center mt-1">
-                            <Phone className="w-3 h-3 mr-1" />
-                            {client.phone}
-                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5">📞 {client.phone}</p>
                         )}
                       </div>
                       <Button
                         size="sm"
                         onClick={() => openUploadModal(client)}
-                        className="bg-blue-600 ml-2"
+                        className="bg-blue-600 h-7 px-2 text-xs"
                       >
-                        <Send className="w-4 h-4" />
+                        <Send className="w-3 h-3 mr-1" /> Envoyer
                       </Button>
                     </div>
                   </CardContent>
@@ -286,7 +282,7 @@ const VetDashboardMobile = () => {
 
         {/* Send Tab - Same as clients but focused on sending */}
         {activeTab === 'send' && (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {/* Search */}
             <div className="flex gap-2">
               <Input
@@ -294,27 +290,27 @@ const VetDashboardMobile = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && searchClients()}
-                className="flex-1"
+                className="flex-1 h-9 text-sm"
               />
-              <Button onClick={searchClients} size="icon" className="bg-blue-600">
+              <Button onClick={searchClients} size="icon" className="bg-blue-600 h-9 w-9">
                 <Search className="w-4 h-4" />
               </Button>
             </div>
 
-            <p className="text-sm text-gray-500">
-              Sélectionnez un client pour lui envoyer un résultat d'analyse
+            <p className="text-xs text-gray-500">
+              Sélectionnez un client pour envoyer un résultat
             </p>
 
-            {/* Clients List */}
+            {/* Clients List - Compact */}
             {loading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <div className="text-center py-6">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
               </div>
             ) : clients.length === 0 ? (
               <Card>
-                <CardContent className="py-12 text-center">
-                  <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500 font-medium">Aucun client trouvé</p>
+                <CardContent className="py-8 text-center">
+                  <Users className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                  <p className="text-gray-500 text-sm">Aucun client trouvé</p>
                 </CardContent>
               </Card>
             ) : (
@@ -324,13 +320,13 @@ const VetDashboardMobile = () => {
                   className="cursor-pointer hover:border-blue-300 transition-colors"
                   onClick={() => openUploadModal(client)}
                 >
-                  <CardContent className="p-4">
+                  <CardContent className="p-3">
                     <div className="flex justify-between items-center">
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-gray-900">{client.full_name}</h4>
-                        <p className="text-sm text-gray-500">{client.email}</p>
+                        <h4 className="font-medium text-sm text-gray-900 truncate">{client.full_name}</h4>
+                        <p className="text-xs text-gray-500 truncate">{client.email}</p>
                       </div>
-                      <Send className="w-5 h-5 text-blue-600" />
+                      <Send className="w-4 h-4 text-blue-600 shrink-0" />
                     </div>
                   </CardContent>
                 </Card>
