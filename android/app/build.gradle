@@ -20,8 +20,6 @@ android {
     
     signingConfigs {
         release {
-            // You'll need to create a keystore file for signing
-            // Run: keytool -genkey -v -keystore vetdz-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias vetdz
             if (project.hasProperty('VETDZ_RELEASE_STORE_FILE')) {
                 storeFile file(VETDZ_RELEASE_STORE_FILE)
                 storePassword VETDZ_RELEASE_STORE_PASSWORD
@@ -32,45 +30,32 @@ android {
     }
     
     buildTypes {
-        debug {
-            debuggable true
-            minifyEnabled false
-        }
         release {
-            minifyEnabled true
-            shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             if (project.hasProperty('VETDZ_RELEASE_STORE_FILE')) {
                 signingConfig signingConfigs.release
             }
         }
     }
-    
-    buildFeatures {
-        viewBinding true
+}
+
+repositories {
+    flatDir {
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
     }
 }
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
-    
-    // AndroidX
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
-    implementation "androidx.core:core-ktx:$androidxCoreVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
-    implementation "androidx.webkit:webkit:$androidxWebkitVersion"
-    implementation "androidx.constraintlayout:constraintlayout:2.1.4"
-    
-    // Firebase
-    implementation platform('com.google.firebase:firebase-bom:32.7.0')
-    implementation 'com.google.firebase:firebase-messaging'
-    implementation 'com.google.firebase:firebase-analytics'
-    
-    // Testing
+    implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
 }
 
-// Apply Google Services plugin (uncomment when google-services.json is added)
-// apply plugin: 'com.google.gms.google-services'
+apply from: 'capacitor.build.gradle'
