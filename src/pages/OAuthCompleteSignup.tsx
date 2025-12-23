@@ -96,6 +96,14 @@ const OAuthCompleteSignup = () => {
 
       if (existingProfile) {
         console.log('✅ Profile already exists, redirecting...');
+        
+        // Mark user setup as complete (first_time = false)
+        try {
+          await supabase.rpc('mark_user_setup_complete', { target_user_id: user.id });
+        } catch (e) {
+          console.log('Could not mark setup complete:', e);
+        }
+        
         // Clear OAuth signup flag
         localStorage.removeItem('oauthNewUser');
         
@@ -168,6 +176,13 @@ const OAuthCompleteSignup = () => {
       
       console.log('✅ Profile created successfully!');
       
+      // Mark user setup as complete (first_time = false)
+      try {
+        await supabase.rpc('mark_user_setup_complete', { target_user_id: user.id });
+      } catch (e) {
+        console.log('Could not mark setup complete:', e);
+      }
+      
       // Clear OAuth signup flag
       localStorage.removeItem('oauthNewUser');
       
@@ -226,6 +241,13 @@ const OAuthCompleteSignup = () => {
           variant: "destructive"
         });
         return;
+      }
+
+      // Mark user setup as complete (first_time = false)
+      try {
+        await supabase.rpc('mark_user_setup_complete', { target_user_id: userData.id });
+      } catch (e) {
+        console.log('Could not mark setup complete:', e);
       }
 
       // Clear OAuth signup flag
