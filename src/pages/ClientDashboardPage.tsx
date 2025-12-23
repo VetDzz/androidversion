@@ -1,8 +1,15 @@
 import ClientDashboard from '@/components/ClientDashboard';
+import ClientDashboardMobile from '@/components/ClientDashboardMobile';
 import PageLayout from '@/components/PageLayout';
 import SEO from '@/components/SEO';
+import { isAndroidWebView } from '@/utils/platform';
 
 const ClientDashboardPage = () => {
+  // Use mobile layout for Android app
+  if (isAndroidWebView()) {
+    return <ClientDashboardMobile />;
+  }
+
   return (
     <PageLayout showFooter={false}>
       <SEO

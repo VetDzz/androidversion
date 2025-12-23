@@ -1,10 +1,18 @@
 import PageLayout from '@/components/PageLayout';
 import SEO from '@/components/SEO';
 import AccurateMapComponent from '@/components/AccurateMapComponent';
+import FindVetMobile from '@/pages/FindVetMobile';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { isAndroidWebView } from '@/utils/platform';
 
 const FindvetPage = () => {
   const { t } = useLanguage();
+
+  // Use mobile layout for Android app
+  if (isAndroidWebView()) {
+    return <FindVetMobile />;
+  }
+
   return (
     <PageLayout showFooter={true}>
       <SEO

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthPage from './AuthPage';
+import { isAndroidWebView } from '@/utils/platform';
 
 const SmartHome = () => {
   const { isAuthenticated, user } = useAuth();
@@ -11,9 +12,13 @@ const SmartHome = () => {
     if (isAuthenticated && user) {
       // Redirect authenticated users to their dashboard
       if (user.type === 'vet' || user.type === 'laboratory') {
-        navigate('/vet-dashboard', { replace: true });
+        // For mobile, go to vet dashboard with clients tab
+        const path = isAndroidWebView() ? '/vet-dashboard?tab=clients' : '/vet-dashboard';
+        navigate(path, { replace: true });
       } else {
-        navigate('/client-dashboard', { replace: true });
+        // For mobile, go to find-laboratory (Trouver Vet)
+        const path = isAndroidWebView() ? '/find-laboratory' : '/client-dashboard';
+        navigate(path, { replace: true });
       }
     }
   }, [isAuthenticated, user, navigate]);
