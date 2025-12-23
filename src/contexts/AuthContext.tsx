@@ -230,9 +230,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser(userData);
         localStorage.setItem('user', JSON.stringify(userData));
 
-        // Initialize push notifications for native app
-        if (isNativeApp()) {
-          initPushNotifications(data.user.id, actualUserType);
+        // Initialize push notifications for native app (wrapped in try-catch)
+        try {
+          if (isNativeApp()) {
+            initPushNotifications(data.user.id, actualUserType);
+          }
+        } catch (e) {
+          console.log('Push notification init skipped');
         }
 
         return { success: true, userType: actualUserType };
@@ -423,9 +427,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setUser(userData);
           localStorage.setItem('user', JSON.stringify(userData));
 
-          // Initialize push notifications for native app
-          if (isNativeApp()) {
-            initPushNotifications(session.user.id, userType);
+          // Initialize push notifications for native app (wrapped in try-catch)
+          try {
+            if (isNativeApp()) {
+              initPushNotifications(session.user.id, userType);
+            }
+          } catch (e) {
+            console.log('Push notification init skipped');
           }
 
         } else if (event === 'SIGNED_OUT') {
