@@ -55,11 +55,12 @@ jobs:
       run: |
         sed -i 's|// apply plugin|apply plugin|g' android/app/build.gradle
     
-    - name: Configure Gradle properties
+    - name: Setup Gradle properties with AndroidX
       run: |
-        cat >> android/gradle.properties << 'EOF'
-        
-        # Signing config
+        cat > android/gradle.properties << 'EOF'
+        org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+        android.useAndroidX=true
+        android.enableJetifier=true
         VETDZ_RELEASE_STORE_FILE=release-key.jks
         VETDZ_RELEASE_STORE_PASSWORD=vetdz2024secure
         VETDZ_RELEASE_KEY_ALIAS=vetdz
@@ -81,7 +82,7 @@ jobs:
     - name: Build Release APK
       run: |
         cd android
-        ./gradlew assembleRelease --no-daemon
+        ./gradlew assembleRelease --no-daemon --stacktrace
     
     - name: Upload Signed APK
       uses: actions/upload-artifact@v4
