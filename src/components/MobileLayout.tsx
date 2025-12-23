@@ -27,10 +27,10 @@ const MobileLayout = ({ children, hideNav = false }: MobileLayoutProps) => {
     { icon: Bell, label: 'Notifications', path: '/client-dashboard?tab=notifications', key: 'notifications' },
   ];
 
-  // Vet navigation items - Trouver Client, Envoyer Résultat, Mes Demandes, Déconnexion
+  // Vet navigation items - Trouver Client, Mes Résultats, Mes Demandes, Déconnexion
   const vetNavItems = [
     { icon: Users, label: 'Trouver Client', path: '/vet-dashboard?tab=clients', key: 'clients' },
-    { icon: Send, label: 'Envoyer', path: '/vet-dashboard?tab=send', key: 'send' },
+    { icon: FileText, label: 'Mes Résultats', path: '/vet-dashboard?tab=results', key: 'results' },
     { icon: Inbox, label: 'Mes Demandes', path: '/vet-dashboard?tab=requests', key: 'requests' },
   ];
 

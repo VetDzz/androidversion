@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Users, Search, Bell, Phone, Send, MapPin, Clock } from 'lucide-react';
+import { Users, Search, Bell, Phone, Send, MapPin, Clock, FileText, Eye } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -33,6 +33,17 @@ interface PADRequest {
   created_at: string;
 }
 
+interface SentResult {
+  id: string;
+  client_id: string;
+  title: string;
+  description?: string;
+  file_url?: string;
+  status: string;
+  created_at: string;
+  client_name?: string;
+}
+
 const VetDashboardMobile = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -41,6 +52,7 @@ const VetDashboardMobile = () => {
   const [activeTab, setActiveTab] = useState('clients');
   const [clients, setClients] = useState<Client[]>([]);
   const [requests, setRequests] = useState<PADRequest[]>([]);
+  const [sentResults, setSentResults] = useState<SentResult[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -60,6 +72,7 @@ const VetDashboardMobile = () => {
     if (user) {
       fetchClients();
       fetchRequests();
+      fetchSentResults();
       loadNotificationPreference();
       // Listen for FCM token from Android
       if (isAndroidWebView()) {
@@ -147,6 +160,36 @@ const VetDashboardMobile = () => {
     }
   };
 
+  const fetchSentResults = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('medical_results')
+        .select('*')
+        .eq('vet_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        // Get client names for each result
+        const resultsWithNames = await Promise.all(
+          data.map(async (result: any) => {
+            const { data: clientData } = await supabase
+              .from('client_profiles')
+              .select('full_name')
+              .eq('user_id', result.client_id)
+              .single();
+            return {
+              ...result,
+              client_name: clientData?.full_name || 'Client'
+            };
+          })
+        );
+        setSentResults(resultsWithNames);
+      }
+    } catch (error) {
+      setSentResults([]);
+    }
+  };
+
   const handleApproveRequest = async (request: PADRequest) => {
     try {
       const { error } = await supabase
@@ -214,12 +257,17 @@ const VetDashboardMobile = () => {
         <div className="mb-4">
           <h1 className="text-xl font-bold text-gray-900">
             {activeTab === 'clients' && 'Trouver Client'}
-            {activeTab === 'send' && 'Envoyer Résultat'}
+            {activeTab === 'results' && 'Mes Résultats'}
             {activeTab === 'requests' && 'Mes Demandes'}
           </h1>
           {activeTab === 'requests' && pendingRequests.length > 0 && (
             <p className="text-sm text-orange-600 font-medium">
               {pendingRequests.length} demande{pendingRequests.length > 1 ? 's' : ''} en attente
+            </p>
+          )}
+          {activeTab === 'results' && (
+            <p className="text-sm text-gray-500">
+              {sentResults.length} résultat{sentResults.length !== 1 ? 's' : ''} envoyé{sentResults.length !== 1 ? 's' : ''}
             </p>
           )}
         </div>
@@ -280,53 +328,50 @@ const VetDashboardMobile = () => {
           </div>
         )}
 
-        {/* Send Tab - Same as clients but focused on sending */}
-        {activeTab === 'send' && (
+        {/* Results Tab - Show sent results */}
+        {activeTab === 'results' && (
           <div className="space-y-2">
-            {/* Search */}
-            <div className="flex gap-2">
-              <Input
-                placeholder="Rechercher un client..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && searchClients()}
-                className="flex-1 h-9 text-sm"
-              />
-              <Button onClick={searchClients} size="icon" className="bg-blue-600 h-9 w-9">
-                <Search className="w-4 h-4" />
-              </Button>
-            </div>
-
-            <p className="text-xs text-gray-500">
-              Sélectionnez un client pour envoyer un résultat
-            </p>
-
-            {/* Clients List - Compact */}
             {loading ? (
               <div className="text-center py-6">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
               </div>
-            ) : clients.length === 0 ? (
+            ) : sentResults.length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center">
-                  <Users className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                  <p className="text-gray-500 text-sm">Aucun client trouvé</p>
+                  <FileText className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                  <p className="text-gray-500 text-sm">Aucun résultat envoyé</p>
+                  <p className="text-gray-400 text-xs mt-1">Les résultats que vous envoyez apparaîtront ici</p>
                 </CardContent>
               </Card>
             ) : (
-              clients.map((client) => (
-                <Card 
-                  key={client.id} 
-                  className="cursor-pointer hover:border-blue-300 transition-colors"
-                  onClick={() => openUploadModal(client)}
-                >
+              sentResults.map((result) => (
+                <Card key={result.id}>
                   <CardContent className="p-3">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-start gap-2">
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-sm text-gray-900 truncate">{client.full_name}</h4>
-                        <p className="text-xs text-gray-500 truncate">{client.email}</p>
+                        <h4 className="font-medium text-sm text-gray-900 truncate">{result.title || 'Analyse'}</h4>
+                        <p className="text-xs text-gray-500 mt-0.5">👤 {result.client_name}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          📅 {new Date(result.created_at).toLocaleDateString('fr-FR', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </p>
                       </div>
-                      <Send className="w-4 h-4 text-blue-600 shrink-0" />
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-green-100 text-green-800 text-[10px]">Envoyé</Badge>
+                        {result.file_url && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7"
+                            onClick={() => window.open(result.file_url, '_blank')}
+                          >
+                            <Eye className="w-4 h-4 text-blue-600" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
