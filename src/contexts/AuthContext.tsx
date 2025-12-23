@@ -29,6 +29,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Helper function to get user type from database with timeout and caching
 // Returns null if user has no profile (needs to select role)
 const getUserTypeFromDatabase = async (userId: string): Promise<UserType | null> => {
+  console.log('🔍 getUserTypeFromDatabase called for:', userId);
+  
   // Check cache first (but only if it's recent - within 1 hour)
   const cacheKey = `userType_${userId}`;
   const cacheTimeKey = `userTypeTime_${userId}`;
@@ -41,63 +43,85 @@ const getUserTypeFromDatabase = async (userId: string): Promise<UserType | null>
     const oneHour = 60 * 60 * 1000;
     
     if (now - cached < oneHour) {
+      console.log('✅ Using cached user type:', cachedType);
       return cachedType as UserType;
     } else {
+      console.log('🗑️ Cache expired, clearing');
       localStorage.removeItem(cacheKey);
       localStorage.removeItem(cacheTimeKey);
     }
   }
   
   try {
-    // Create a promise that rejects after 5 seconds
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Database query timeout')), 5000);
+    // Try RPC function first (most reliable, bypasses RLS)
+    console.log('📡 Calling get_user_type RPC...');
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('get_user_type', {
+      check_user_id: userId
     });
     
-    // Race between the query and timeout
-    const result = await Promise.race([
-      (async () => {
-        // Try RPC function first (most reliable, bypasses RLS)
-        try {
-          const { data: rpcResult, error: rpcError } = await supabase.rpc('get_user_type', {
-            check_user_id: userId
-          });
-          
-          if (!rpcError && rpcResult && rpcResult.has_profile) {
-            const userType = rpcResult.user_type as UserType;
-            localStorage.setItem(`userType_${userId}`, userType);
-            localStorage.setItem(`userTypeTime_${userId}`, Date.now().toString());
-            return userType;
-          }
-          
-          if (!rpcError && rpcResult && !rpcResult.has_profile) {
-            // User definitely has no profile
-            return null;
-          }
-        } catch (rpcErr) {
-          console.log('RPC not available, falling back to direct query');
-        }
+    console.log('📡 RPC result:', rpcResult, 'error:', rpcError);
+    
+    if (!rpcError && rpcResult) {
+      if (rpcResult.has_profile) {
+        const userType = rpcResult.user_type as UserType;
+        console.log('✅ User has profile:', userType);
+        localStorage.setItem(`userType_${userId}`, userType);
+        localStorage.setItem(`userTypeTime_${userId}`, Date.now().toString());
+        return userType;
+      } else {
+        console.log('❌ User has NO profile');
+        return null;
+      }
+    }
+    
+    if (rpcError) {
+      console.log('⚠️ RPC error, falling back to direct query:', rpcError);
+    }
 
-        // Fallback: Direct table queries
-        const { data: vetProfile, error: vetError } = await supabase
-          .from('vet_profiles')
-          .select('user_id')
-          .eq('user_id', userId)
-          .maybeSingle();
+    // Fallback: Direct table queries
+    const { data: vetProfile, error: vetError } = await supabase
+      .from('vet_profiles')
+      .select('user_id')
+      .eq('user_id', userId)
+      .maybeSingle();
 
-        if (vetProfile && !vetError) {
-          localStorage.setItem(`userType_${userId}`, 'vet');
-          localStorage.setItem(`userTypeTime_${userId}`, Date.now().toString());
-          return 'vet' as UserType;
-        }
+    console.log('📡 Vet profile query:', vetProfile, vetError);
 
-        const { data: clientProfile, error: clientError } = await supabase
-          .from('client_profiles')
-          .select('user_id')
-          .eq('user_id', userId)
-          .maybeSingle();
+    if (vetProfile && !vetError) {
+      console.log('✅ Found vet profile');
+      localStorage.setItem(`userType_${userId}`, 'vet');
+      localStorage.setItem(`userTypeTime_${userId}`, Date.now().toString());
+      return 'vet' as UserType;
+    }
 
-        if (clientProfile && !clientError) {
+    const { data: clientProfile, error: clientError } = await supabase
+      .from('client_profiles')
+      .select('user_id')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    console.log('📡 Client profile query:', clientProfile, clientError);
+
+    if (clientProfile && !clientError) {
+      console.log('✅ Found client profile');
+      localStorage.setItem(`userType_${userId}`, 'client');
+      localStorage.setItem(`userTypeTime_${userId}`, Date.now().toString());
+      return 'client' as UserType;
+    }
+
+    console.log('❌ No profile found in fallback queries');
+    return null;
+  } catch (error) {
+    console.log('❌ getUserTypeFromDatabase error:', error);
+    // If error, check cache one more time before giving up
+    const fallbackCache = localStorage.getItem(cacheKey);
+    if (fallbackCache === 'vet' || fallbackCache === 'client') {
+      console.log('🔄 Using fallback cache:', fallbackCache);
+      return fallbackCache as UserType;
+    }
+    return null;
+  }
+};
           localStorage.setItem(`userType_${userId}`, 'client');
           localStorage.setItem(`userTypeTime_${userId}`, Date.now().toString());
           return 'client' as UserType;

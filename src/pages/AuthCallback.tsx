@@ -142,14 +142,15 @@ const AuthCallback = () => {
             description: "Bienvenue sur VetDZ !",
           });
           
-          // Redirect based on profile type - use mobile-friendly routes
+          // Redirect based on profile type
+          // The dashboard pages auto-detect Android WebView and show mobile UI
           setTimeout(() => {
             if (hasVetProfile) {
-              // Vet goes to find clients
-              window.location.href = '/#/vet-dashboard?tab=clients';
+              // Vet goes to vet dashboard (auto-shows VetDashboardMobile on Android)
+              window.location.href = '/#/vet-dashboard';
             } else {
-              // Client goes to find vets
-              window.location.href = '/#/find-laboratory';
+              // Client goes to client dashboard (auto-shows ClientDashboardMobile on Android)
+              window.location.href = '/#/client-dashboard';
             }
           }, 500);
           return;
