@@ -122,28 +122,6 @@ const getUserTypeFromDatabase = async (userId: string): Promise<UserType | null>
     return null;
   }
 };
-          localStorage.setItem(`userType_${userId}`, 'client');
-          localStorage.setItem(`userTypeTime_${userId}`, Date.now().toString());
-          return 'client' as UserType;
-        }
-
-        // No profile found
-        return null;
-      })(),
-      timeoutPromise
-    ]);
-    
-    return result;
-  } catch (error) {
-    console.log('getUserTypeFromDatabase error:', error);
-    // If timeout or error, check cache one more time before giving up
-    const fallbackCache = localStorage.getItem(cacheKey);
-    if (fallbackCache === 'vet' || fallbackCache === 'client') {
-      return fallbackCache as UserType;
-    }
-    return null;
-  }
-};
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
