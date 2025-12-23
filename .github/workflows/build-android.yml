@@ -1,0 +1,99 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+    
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+    
+    - name: Create google-services.json
+      run: |
+        cat > android/app/google-services.json << 'EOF'
+        {
+          "project_info": {
+            "project_number": "000000000000",
+            "project_id": "vetdzz-98abc",
+            "storage_bucket": "vetdzz-98abc.appspot.com"
+          },
+          "client": [
+            {
+              "client_info": {
+                "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+                "android_client_info": {
+                  "package_name": "dz.vet.vetdz"
+                }
+              },
+              "oauth_client": [],
+              "api_key": [
+                {
+                  "current_key": "placeholder"
+                }
+              ],
+              "services": {}
+            }
+          ],
+          "configuration_version": "1"
+        }
+        EOF
+    
+    - name: Enable Google Services plugin
+      run: |
+        sed -i 's|// apply plugin|apply plugin|g' android/app/build.gradle
+    
+    - name: Grant execute permission for gradlew
+      run: chmod +x android/gradlew
+    
+    - name: Generate Keystore
+      run: |
+        keytool -genkey -v -keystore android/app/release-key.jks \
+          -keyalg RSA -keysize 2048 -validity 10000 \
+          -alias vetdz \
+          -storepass vetdz2024secure \
+          -keypass vetdz2024secure \
+          -dname "CN=VetDZ, OU=Mobile, O=VetDZ, L=Algiers, ST=Algiers, C=DZ"
+    
+    - name: Create signing config
+      run: |
+        echo "VETDZ_RELEASE_STORE_FILE=release-key.jks" >> android/gradle.properties
+        echo "VETDZ_RELEASE_STORE_PASSWORD=vetdz2024secure" >> android/gradle.properties
+        echo "VETDZ_RELEASE_KEY_ALIAS=vetdz" >> android/gradle.properties
+        echo "VETDZ_RELEASE_KEY_PASSWORD=vetdz2024secure" >> android/gradle.properties
+      
+    - name: Build Release APK
+      run: |
+        cd android
+        ./gradlew assembleRelease --no-daemon
+    
+    - name: Upload Signed APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: vetdz-release-apk
+        path: android/app/build/outputs/apk/release/app-release.apk
+        retention-days: 90
+    
+    - name: Build Debug APK
+      run: |
+        cd android
+        ./gradlew assembleDebug --no-daemon
+    
+    - name: Upload Debug APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: vetdz-debug-apk
+        path: android/app/build/outputs/apk/debug/app-debug.apk
+        retention-days: 90

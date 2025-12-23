@@ -1,0 +1,3 @@
+include ':app'
+
+// Note: Capacitor plugins removed - using pure WebView approach
