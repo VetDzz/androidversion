@@ -49,15 +49,36 @@ const getUserTypeFromDatabase = async (userId: string): Promise<UserType | null>
   }
   
   try {
-    // Create a promise that rejects after 3 seconds
+    // Create a promise that rejects after 5 seconds
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Database query timeout')), 3000);
+      setTimeout(() => reject(new Error('Database query timeout')), 5000);
     });
     
     // Race between the query and timeout
     const result = await Promise.race([
       (async () => {
-        // Check if user has a vet profile (use maybeSingle to avoid errors)
+        // Try RPC function first (most reliable, bypasses RLS)
+        try {
+          const { data: rpcResult, error: rpcError } = await supabase.rpc('get_user_type', {
+            check_user_id: userId
+          });
+          
+          if (!rpcError && rpcResult && rpcResult.has_profile) {
+            const userType = rpcResult.user_type as UserType;
+            localStorage.setItem(`userType_${userId}`, userType);
+            localStorage.setItem(`userTypeTime_${userId}`, Date.now().toString());
+            return userType;
+          }
+          
+          if (!rpcError && rpcResult && !rpcResult.has_profile) {
+            // User definitely has no profile
+            return null;
+          }
+        } catch (rpcErr) {
+          console.log('RPC not available, falling back to direct query');
+        }
+
+        // Fallback: Direct table queries
         const { data: vetProfile, error: vetError } = await supabase
           .from('vet_profiles')
           .select('user_id')
@@ -70,7 +91,6 @@ const getUserTypeFromDatabase = async (userId: string): Promise<UserType | null>
           return 'vet' as UserType;
         }
 
-        // Check if user has a client profile (use maybeSingle to avoid errors)
         const { data: clientProfile, error: clientError } = await supabase
           .from('client_profiles')
           .select('user_id')
@@ -83,7 +103,7 @@ const getUserTypeFromDatabase = async (userId: string): Promise<UserType | null>
           return 'client' as UserType;
         }
 
-        // No profile found - return null to indicate user needs to select role
+        // No profile found
         return null;
       })(),
       timeoutPromise
@@ -91,7 +111,12 @@ const getUserTypeFromDatabase = async (userId: string): Promise<UserType | null>
     
     return result;
   } catch (error) {
-    // If timeout or error, return null to be safe
+    console.log('getUserTypeFromDatabase error:', error);
+    // If timeout or error, check cache one more time before giving up
+    const fallbackCache = localStorage.getItem(cacheKey);
+    if (fallbackCache === 'vet' || fallbackCache === 'client') {
+      return fallbackCache as UserType;
+    }
     return null;
   }
 };
