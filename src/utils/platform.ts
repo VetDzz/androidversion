@@ -1,20 +1,19 @@
-import { Capacitor } from '@capacitor/core';
-import { PushNotifications } from '@capacitor/push-notifications';
 import { supabase } from '@/lib/supabase';
 
 // Detect if running in Capacitor native app
 export const isNativeApp = (): boolean => {
-  return Capacitor.isNativePlatform();
+  try {
+    const Capacitor = (window as any).Capacitor;
+    return Capacitor?.isNativePlatform?.() || false;
+  } catch {
+    return false;
+  }
 };
 
 // Get the correct OAuth redirect URL based on platform
 export const getOAuthRedirectUrl = (): string => {
-  if (isNativeApp()) {
-    // Use custom URL scheme for native app
-    return 'dz.vet.vetdz://auth/callback';
-  }
-  // Use web URL for browser
-  return `${window.location.origin}/#/auth/callback`;
+  // Always use Supabase callback - it will handle the redirect
+  return 'https://plwfbeqtupboeerqiplw.supabase.co/auth/v1/callback';
 };
 
 // Initialize push notifications for native app
@@ -25,6 +24,9 @@ export const initPushNotifications = async (userId: string, userType: 'client' |
   }
 
   try {
+    // Dynamically import Capacitor push notifications
+    const { PushNotifications } = await import('@capacitor/push-notifications');
+    
     // Request permission
     const permStatus = await PushNotifications.requestPermissions();
     
@@ -63,13 +65,11 @@ export const initPushNotifications = async (userId: string, userType: 'client' |
     // Listen for push notifications received
     PushNotifications.addListener('pushNotificationReceived', (notification) => {
       console.log('Push notification received:', notification);
-      // You can show a local notification or update UI here
     });
 
     // Listen for push notification action (when user taps notification)
     PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
       console.log('Push notification action performed:', notification);
-      // Navigate to relevant screen based on notification data
       const data = notification.notification.data;
       if (data?.type === 'cvd_accepted' || data?.type === 'cvd_rejected') {
         window.location.href = '/#/client-dashboard?tab=notifications';
