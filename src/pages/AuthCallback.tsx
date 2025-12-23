@@ -87,25 +87,48 @@ const AuthCallback = () => {
           const provider = supabaseUser.app_metadata?.provider;
           const isOAuthLogin = provider === 'google' || provider === 'facebook';
           
-          // Check user profiles in database
-          const { data: clientProfile } = await supabase
-            .from('client_profiles')
-            .select('user_id')
-            .eq('user_id', supabaseUser.id)
-            .maybeSingle();
+          // Use RPC function to reliably check user type (bypasses RLS)
+          let hasClientProfile = false;
+          let hasVetProfile = false;
           
-          const { data: vetProfile } = await supabase
-            .from('vet_profiles')
-            .select('user_id')
-            .eq('user_id', supabaseUser.id)
-            .maybeSingle();
+          try {
+            const { data: rpcResult, error: rpcError } = await supabase.rpc('get_user_type', {
+              check_user_id: supabaseUser.id
+            });
+            
+            if (!rpcError && rpcResult) {
+              hasVetProfile = rpcResult.user_type === 'vet';
+              hasClientProfile = rpcResult.user_type === 'client';
+              
+              // If user has profile, update cache and redirect
+              if (rpcResult.has_profile) {
+                localStorage.setItem(`userType_${supabaseUser.id}`, rpcResult.user_type);
+                localStorage.setItem(`userTypeTime_${supabaseUser.id}`, Date.now().toString());
+              }
+            }
+          } catch (rpcErr) {
+            console.log('RPC failed, trying direct query:', rpcErr);
+            // Fallback to direct queries
+            const { data: clientProfile } = await supabase
+              .from('client_profiles')
+              .select('user_id')
+              .eq('user_id', supabaseUser.id)
+              .maybeSingle();
+            
+            const { data: vetProfile } = await supabase
+              .from('vet_profiles')
+              .select('user_id')
+              .eq('user_id', supabaseUser.id)
+              .maybeSingle();
+            
+            hasClientProfile = !!clientProfile;
+            hasVetProfile = !!vetProfile;
+          }
           
-          const hasClientProfile = !!clientProfile;
-          const hasVetProfile = !!vetProfile;
-          
-          // If user has no profile (OAuth or email), redirect to complete signup
+          // If user has no profile, redirect to complete signup (select client/vet)
           if (!hasClientProfile && !hasVetProfile) {
             setStatus('success');
+            console.log('No profile found, redirecting to oauth-complete');
             setTimeout(() => {
               window.location.href = '/#/oauth-complete';
             }, 300);
