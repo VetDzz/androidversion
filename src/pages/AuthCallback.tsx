@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 
 const AuthCallback = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { toast } = useToast();
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'no-account'>('loading');
 
@@ -15,21 +14,14 @@ const AuthCallback = () => {
     const handleAuthCallback = async () => {
       try {
         const fullUrl = window.location.href;
+        console.log('🔐 AuthCallback started:', fullUrl);
         
         // Check if there are tokens in the URL (email confirmation or OAuth)
         if (fullUrl.includes('access_token=')) {
-          // Extract token part - handle both formats:
-          // 1. HashRouter format: domain/#/auth/callback#access_token=...
-          // 2. Direct format: domain/#access_token=...
           let tokenPart = '';
-          
-          // Find the part with access_token
           const accessTokenIndex = fullUrl.indexOf('access_token=');
           if (accessTokenIndex !== -1) {
-            // Get everything from access_token onwards
             tokenPart = fullUrl.substring(accessTokenIndex);
-            
-            // Remove any trailing hash routes
             if (tokenPart.includes('#/')) {
               tokenPart = tokenPart.split('#/')[0];
             }
@@ -39,10 +31,9 @@ const AuthCallback = () => {
             const params = new URLSearchParams(tokenPart);
             const accessToken = params.get('access_token');
             const refreshToken = params.get('refresh_token');
-            const type = params.get('type'); // 'signup' for email confirmation
             
             if (accessToken) {
-              // Set the session manually
+              console.log('🔑 Setting session from URL token...');
               const { error: setError } = await supabase.auth.setSession({
                 access_token: accessToken,
                 refresh_token: refreshToken || ''
@@ -52,25 +43,24 @@ const AuthCallback = () => {
                 throw new Error(setError.message);
               }
               
-              // Clean up the URL
               window.history.replaceState(null, '', window.location.origin + '/#/auth/callback');
             }
           }
         }
         
         // Small delay to ensure session is set
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 200));
 
         // Get session
         const { data, error } = await supabase.auth.getSession();
+        console.log('📋 Session check:', data?.session ? 'Found' : 'Not found');
 
-        if (error) {
-
+        if (error || !data.session) {
           if (isMounted) {
             setStatus('error');
             toast({
               title: "Erreur de connexion",
-              description: error.message,
+              description: error?.message || "Session non trouvée",
               variant: "destructive"
             });
             setTimeout(() => navigate('/auth'), 2000);
@@ -80,96 +70,94 @@ const AuthCallback = () => {
 
         if (!isMounted) return;
 
-        if (data.session) {
-          const supabaseUser = data.session.user;
-          
-          // Check if this is an OAuth login (Google/Facebook)
-          const provider = supabaseUser.app_metadata?.provider;
-          const isOAuthLogin = provider === 'google' || provider === 'facebook';
-          
-          // Use RPC function to reliably check user type (bypasses RLS)
-          let hasClientProfile = false;
-          let hasVetProfile = false;
-          
-          try {
-            const { data: rpcResult, error: rpcError } = await supabase.rpc('get_user_type', {
-              check_user_id: supabaseUser.id
-            });
-            
-            if (!rpcError && rpcResult) {
-              hasVetProfile = rpcResult.user_type === 'vet';
-              hasClientProfile = rpcResult.user_type === 'client';
-              
-              // If user has profile, update cache and redirect
-              if (rpcResult.has_profile) {
-                localStorage.setItem(`userType_${supabaseUser.id}`, rpcResult.user_type);
-                localStorage.setItem(`userTypeTime_${supabaseUser.id}`, Date.now().toString());
-              }
-            }
-          } catch (rpcErr) {
-            console.log('RPC failed, trying direct query:', rpcErr);
-            // Fallback to direct queries
-            const { data: clientProfile } = await supabase
-              .from('client_profiles')
-              .select('user_id')
-              .eq('user_id', supabaseUser.id)
-              .maybeSingle();
-            
-            const { data: vetProfile } = await supabase
-              .from('vet_profiles')
-              .select('user_id')
-              .eq('user_id', supabaseUser.id)
-              .maybeSingle();
-            
-            hasClientProfile = !!clientProfile;
-            hasVetProfile = !!vetProfile;
-          }
-          
-          // If user has no profile, redirect to complete signup (select client/vet)
-          if (!hasClientProfile && !hasVetProfile) {
-            setStatus('success');
-            console.log('No profile found, redirecting to oauth-complete');
-            setTimeout(() => {
-              window.location.href = '/#/oauth-complete';
-            }, 300);
-            return;
-          }
-
-          // User has profile - redirect to appropriate home
+        const supabaseUser = data.session.user;
+        const provider = supabaseUser.app_metadata?.provider;
+        const isOAuthLogin = provider === 'google' || provider === 'facebook';
+        
+        console.log('👤 User:', supabaseUser.id, 'Provider:', provider);
+        
+        // Check cache first for instant redirect
+        const cachedType = localStorage.getItem(`userType_${supabaseUser.id}`);
+        const cacheTime = localStorage.getItem(`userTypeTime_${supabaseUser.id}`);
+        const oneHour = 60 * 60 * 1000;
+        
+        if (cachedType && cacheTime && (Date.now() - parseInt(cacheTime)) < oneHour) {
+          console.log('⚡ Using cached user type:', cachedType);
           setStatus('success');
           toast({
-            title: isOAuthLogin ? "Connexion réussie" : "Email confirmé",
+            title: "Connexion réussie",
             description: "Bienvenue sur VetDZ !",
           });
-          
-          // Redirect based on profile type
-          // The dashboard pages auto-detect Android WebView and show mobile UI
           setTimeout(() => {
-            if (hasVetProfile) {
-              // Vet goes to vet dashboard (auto-shows VetDashboardMobile on Android)
-              window.location.href = '/#/vet-dashboard';
-            } else {
-              // Client goes to client dashboard (auto-shows ClientDashboardMobile on Android)
-              window.location.href = '/#/client-dashboard';
-            }
-          }, 500);
+            window.location.href = cachedType === 'vet' ? '/#/vet-dashboard' : '/#/client-dashboard';
+          }, 300);
           return;
-        } else {
-          // No session found
-          setStatus('error');
-          toast({
-            title: "Erreur de connexion",
-            description: "Session non trouvée. Veuillez réessayer.",
-            variant: "destructive"
-          });
-          setTimeout(() => navigate('/auth'), 2000);
         }
+        
+        // Fast parallel profile check with 5 second timeout
+        let hasClientProfile = false;
+        let hasVetProfile = false;
+        
+        const profileCheckPromise = Promise.all([
+          supabase.from('client_profiles').select('user_id').eq('user_id', supabaseUser.id).maybeSingle(),
+          supabase.from('vet_profiles').select('user_id').eq('user_id', supabaseUser.id).maybeSingle()
+        ]);
+        
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
+        
+        const result = await Promise.race([profileCheckPromise, timeoutPromise]);
+        
+        if (result && Array.isArray(result)) {
+          const [clientResult, vetResult] = result;
+          hasClientProfile = !!clientResult.data;
+          hasVetProfile = !!vetResult.data;
+          console.log('📊 Profile check:', { hasClientProfile, hasVetProfile });
+          
+          // Update cache
+          if (hasVetProfile) {
+            localStorage.setItem(`userType_${supabaseUser.id}`, 'vet');
+            localStorage.setItem(`userTypeTime_${supabaseUser.id}`, Date.now().toString());
+          } else if (hasClientProfile) {
+            localStorage.setItem(`userType_${supabaseUser.id}`, 'client');
+            localStorage.setItem(`userTypeTime_${supabaseUser.id}`, Date.now().toString());
+          }
+        } else {
+          console.log('⏱️ Profile check timed out, redirecting to role selection');
+        }
+        
+        // If no profile found, redirect to complete signup
+        if (!hasClientProfile && !hasVetProfile) {
+          setStatus('success');
+          console.log('➡️ No profile, redirecting to oauth-complete');
+          setTimeout(() => {
+            window.location.href = '/#/oauth-complete';
+          }, 200);
+          return;
+        }
+
+        // User has profile - redirect to dashboard
+        setStatus('success');
+        toast({
+          title: isOAuthLogin ? "Connexion réussie" : "Email confirmé",
+          description: "Bienvenue sur VetDZ !",
+        });
+        
+        console.log('➡️ Redirecting to dashboard');
+        setTimeout(() => {
+          if (hasVetProfile) {
+            window.location.href = '/#/vet-dashboard';
+          } else {
+            window.location.href = '/#/client-dashboard';
+          }
+        }, 300);
+        
       } catch (error: any) {
+        console.error('❌ AuthCallback error:', error);
         if (isMounted) {
           setStatus('error');
           toast({
             title: "Erreur",
-            description: error?.message || "Une erreur est survenue. Veuillez réessayer.",
+            description: error?.message || "Une erreur est survenue.",
             variant: "destructive"
           });
           setTimeout(() => navigate('/auth'), 2000);
@@ -179,18 +167,19 @@ const AuthCallback = () => {
 
     handleAuthCallback();
     
-    // Add a timeout to prevent infinite loading - increased to 15 seconds
+    // 10 second timeout
     const timeout = setTimeout(() => {
       if (isMounted && status === 'loading') {
+        console.log('⏱️ Global timeout reached');
         setStatus('error');
         toast({
-          title: "Délai d'attente dépassé",
-          description: "La connexion prend trop de temps. Veuillez réessayer.",
+          title: "Délai dépassé",
+          description: "La connexion prend trop de temps.",
           variant: "destructive"
         });
         setTimeout(() => navigate('/auth'), 2000);
       }
-    }, 15000); // 15 second timeout
+    }, 10000);
     
     return () => {
       isMounted = false;
@@ -205,7 +194,7 @@ const AuthCallback = () => {
           <>
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Connexion en cours...</h2>
-            <p className="text-gray-600">Veuillez patienter pendant que nous confirmons votre compte.</p>
+            <p className="text-gray-600">Veuillez patienter</p>
           </>
         )}
         {status === 'success' && (
@@ -216,7 +205,7 @@ const AuthCallback = () => {
               </svg>
             </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Connexion réussie !</h2>
-            <p className="text-gray-600">Redirection en cours...</p>
+            <p className="text-gray-600">Redirection...</p>
           </>
         )}
         {status === 'error' && (
@@ -227,26 +216,7 @@ const AuthCallback = () => {
               </svg>
             </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Erreur de connexion</h2>
-            <p className="text-gray-600">Redirection vers la page de connexion...</p>
-          </>
-        )}
-        {status === 'no-account' && (
-          <>
-            <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Compte non trouvé</h2>
-            <p className="text-gray-600 mb-4">
-              Aucun compte n'est associé à cette adresse email. Veuillez d'abord créer un compte.
-            </p>
-            <button
-              onClick={() => navigate('/auth')}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Créer un compte
-            </button>
+            <p className="text-gray-600">Redirection...</p>
           </>
         )}
       </div>
