@@ -55,6 +55,17 @@ jobs:
       run: |
         sed -i 's|// apply plugin|apply plugin|g' android/app/build.gradle
     
+    - name: Configure Gradle properties
+      run: |
+        cat >> android/gradle.properties << 'EOF'
+        
+        # Signing config
+        VETDZ_RELEASE_STORE_FILE=release-key.jks
+        VETDZ_RELEASE_STORE_PASSWORD=vetdz2024secure
+        VETDZ_RELEASE_KEY_ALIAS=vetdz
+        VETDZ_RELEASE_KEY_PASSWORD=vetdz2024secure
+        EOF
+    
     - name: Grant execute permission for gradlew
       run: chmod +x android/gradlew
     
@@ -66,13 +77,6 @@ jobs:
           -storepass vetdz2024secure \
           -keypass vetdz2024secure \
           -dname "CN=VetDZ, OU=Mobile, O=VetDZ, L=Algiers, ST=Algiers, C=DZ"
-    
-    - name: Create signing config
-      run: |
-        echo "VETDZ_RELEASE_STORE_FILE=release-key.jks" >> android/gradle.properties
-        echo "VETDZ_RELEASE_STORE_PASSWORD=vetdz2024secure" >> android/gradle.properties
-        echo "VETDZ_RELEASE_KEY_ALIAS=vetdz" >> android/gradle.properties
-        echo "VETDZ_RELEASE_KEY_PASSWORD=vetdz2024secure" >> android/gradle.properties
       
     - name: Build Release APK
       run: |
