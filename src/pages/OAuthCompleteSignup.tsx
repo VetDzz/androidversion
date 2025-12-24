@@ -9,12 +9,12 @@ import { useToast } from '@/hooks/use-toast';
 import TermsModal from '@/components/TermsModal';
 import GeolocationModal from '@/components/GeolocationModal';
 
-type Step = 'choose-type' | 'terms' | 'vet-location';
+type Step = 'loading' | 'choose-type' | 'terms' | 'vet-location';
 
 const OAuthCompleteSignup = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [step, setStep] = useState<Step>('choose-type');
+  const [step, setStep] = useState<Step>('loading');
   const [userType, setUserType] = useState<'client' | 'vet' | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -29,44 +29,78 @@ const OAuthCompleteSignup = () => {
         return;
       }
       
-      // Check if user already has a profile using the SECURITY DEFINER function
+      // Check if user already has a profile - TRY MULTIPLE METHODS
       console.log('🔍 Checking if user has profile...');
-      const { data: profileInfo, error: profileError } = await supabase
-        .rpc('get_user_profile_info', { check_user_id: user.id });
       
-      console.log('📊 Profile check result:', profileInfo, profileError);
+      let hasProfile = false;
+      let profileType = '';
       
-      if (!profileError && profileInfo && profileInfo.length > 0) {
-        const profile = profileInfo[0];
+      // Method 1: RPC function
+      try {
+        const { data: profileInfo, error: profileError } = await supabase
+          .rpc('get_user_profile_info', { check_user_id: user.id });
         
-        if (profile.has_profile) {
-          // User already has profile - redirect to dashboard
-          console.log('✅ User already has profile:', profile.user_type);
-          const userType = profile.user_type;
+        console.log('📊 RPC result:', profileInfo, profileError);
+        
+        if (!profileError && profileInfo && profileInfo.length > 0 && profileInfo[0].has_profile) {
+          hasProfile = true;
+          profileType = profileInfo[0].user_type;
+        }
+      } catch (e) {
+        console.log('RPC failed:', e);
+      }
+      
+      // Method 2: Direct queries if RPC failed
+      if (!hasProfile) {
+        const { data: clientProfile } = await supabase
+          .from('client_profiles')
+          .select('user_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (clientProfile) {
+          hasProfile = true;
+          profileType = 'client';
+        } else {
+          const { data: vetProfile } = await supabase
+            .from('vet_profiles')
+            .select('user_id')
+            .eq('user_id', user.id)
+            .maybeSingle();
           
-          // Update cache
-          localStorage.setItem(`userType_${user.id}`, userType);
-          localStorage.setItem(`userTypeTime_${user.id}`, Date.now().toString());
-          
-          toast({
-            title: "Compte existant",
-            description: "Bienvenue de retour !",
-          });
-          
-          // Redirect to dashboard
-          setTimeout(() => {
-            if (userType === 'vet') {
-              window.location.href = '/#/vet-dashboard';
-            } else {
-              window.location.href = '/#/client-dashboard';
-            }
-          }, 500);
-          return;
+          if (vetProfile) {
+            hasProfile = true;
+            profileType = 'vet';
+          }
         }
       }
       
-      // No profile - continue with role selection
+      if (hasProfile && profileType) {
+        // User already has profile - redirect to dashboard
+        console.log('✅ User already has profile:', profileType);
+        
+        // Update cache
+        localStorage.setItem(`userType_${user.id}`, profileType);
+        localStorage.setItem(`userTypeTime_${user.id}`, Date.now().toString());
+        
+        toast({
+          title: "Compte existant",
+          description: "Bienvenue de retour !",
+        });
+        
+        // Redirect to dashboard
+        if (profileType === 'vet') {
+          window.location.href = '/#/vet-dashboard';
+        } else {
+          window.location.href = '/#/client-dashboard';
+        }
+        return;
+      }
+      
+      // No profile - show role selection
+      console.log('❌ No profile found, showing role selection');
       setUserData(user);
+      setStep('choose-type');
     };
     checkUser();
   }, [navigate, toast]);
@@ -315,6 +349,18 @@ const OAuthCompleteSignup = () => {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-lg"
       >
+        {step === 'loading' && (
+          <Card className="shadow-xl">
+            <CardContent className="py-12">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto mb-6"></div>
+                <p className="text-gray-700 text-lg font-medium">Vérification du compte...</p>
+                <p className="text-gray-400 text-sm mt-2">Veuillez patienter</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {step === 'choose-type' && (
           <Card className="shadow-xl">
             <CardHeader className="text-center">
