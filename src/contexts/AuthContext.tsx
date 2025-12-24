@@ -26,12 +26,11 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper function to get user type from database - ALWAYS WORKS
-// Uses SECURITY DEFINER function that bypasses RLS
+// Helper function to get user type from database with 3s timeout
 const getUserTypeFromDatabase = async (userId: string): Promise<UserType | null> => {
   console.log('🔍 getUserTypeFromDatabase called for:', userId);
   
-  // Check cache first
+  // Check cache first - instant return
   const cachedType = localStorage.getItem(`userType_${userId}`);
   const cacheTime = localStorage.getItem(`userTypeTime_${userId}`);
   
@@ -46,36 +45,37 @@ const getUserTypeFromDatabase = async (userId: string): Promise<UserType | null>
     }
   }
   
+  // Try database with 3 second timeout
   try {
-    // Use SECURITY DEFINER function that ALWAYS works
-    console.log('📡 Calling get_user_profile_info...');
-    const { data: profileInfo, error: rpcError } = await supabase
-      .rpc('get_user_profile_info', { check_user_id: userId });
+    const timeoutPromise = new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), 3000);
+    });
     
-    console.log('📡 Profile info:', profileInfo, 'error:', rpcError);
-    
-    if (!rpcError && profileInfo && profileInfo.length > 0) {
-      const profile = profileInfo[0];
+    const dbPromise = (async () => {
+      const { data: profileInfo, error: rpcError } = await supabase
+        .rpc('get_user_profile_info', { check_user_id: userId });
       
-      if (profile.has_profile) {
-        const userType = profile.user_type as UserType;
-        console.log('✅ User has profile:', userType);
-        localStorage.setItem(`userType_${userId}`, userType);
-        localStorage.setItem(`userTypeTime_${userId}`, Date.now().toString());
-        return userType;
-      } else {
-        console.log('❌ User has NO profile');
-        return null;
+      if (!rpcError && profileInfo && profileInfo.length > 0 && profileInfo[0].has_profile) {
+        return profileInfo[0].user_type as UserType;
       }
+      return null;
+    })();
+    
+    const result = await Promise.race([dbPromise, timeoutPromise]);
+    
+    if (result) {
+      console.log('✅ Got user type from DB:', result);
+      localStorage.setItem(`userType_${userId}`, result);
+      localStorage.setItem(`userTypeTime_${userId}`, Date.now().toString());
+      return result;
     }
     
-    console.log('❌ No profile found');
+    console.log('⚠️ DB returned null or timed out');
     return null;
   } catch (error) {
-    console.log('❌ getUserTypeFromDatabase error:', error);
+    console.log('❌ Error:', error);
     // Fallback to cache
     if (cachedType === 'vet' || cachedType === 'client') {
-      console.log('🔄 Using fallback cache:', cachedType);
       return cachedType as UserType;
     }
     return null;
