@@ -52,6 +52,9 @@ public class MainActivity extends BridgeActivity {
             String url = data.toString();
             Log.d(TAG, "Deep link received: " + url);
             
+            // Clear the intent data to prevent re-processing
+            intent.setData(null);
+            
             // Handle OAuth callback from custom scheme (dz.vet.vetdz://auth/callback)
             if (url.startsWith("dz.vet.vetdz://")) {
                 Log.d(TAG, "Custom scheme OAuth callback");
