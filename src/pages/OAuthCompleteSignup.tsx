@@ -23,12 +23,28 @@ const OAuthCompleteSignup = () => {
   useEffect(() => {
     // Check if user is authenticated and has profile already
     const checkUser = async () => {
+      // Wait a bit for session to be established
+      await new Promise(r => setTimeout(r, 1000));
+      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        navigate('/auth');
+        // Try one more time after delay
+        await new Promise(r => setTimeout(r, 1000));
+        const { data: { user: retryUser } } = await supabase.auth.getUser();
+        if (!retryUser) {
+          console.log('❌ No user found after retry');
+          navigate('/auth');
+          return;
+        }
+        // Use retry user
+        await checkProfile(retryUser);
         return;
       }
       
+      await checkProfile(user);
+    };
+    
+    const checkProfile = async (user: any) => {
       // Check if user already has a profile - TRY MULTIPLE METHODS
       console.log('🔍 Checking if user has profile...');
       
@@ -83,12 +99,8 @@ const OAuthCompleteSignup = () => {
         localStorage.setItem(`userType_${user.id}`, profileType);
         localStorage.setItem(`userTypeTime_${user.id}`, Date.now().toString());
         
-        toast({
-          title: "Compte existant",
-          description: "Bienvenue de retour !",
-        });
-        
-        // Redirect to dashboard
+        // Redirect to dashboard - NO TOAST, just redirect
+        console.log('➡️ Redirecting to dashboard...');
         if (profileType === 'vet') {
           window.location.href = '/#/vet-dashboard';
         } else {
@@ -102,8 +114,9 @@ const OAuthCompleteSignup = () => {
       setUserData(user);
       setStep('choose-type');
     };
+    
     checkUser();
-  }, [navigate, toast]);
+  }, [navigate]);
 
   const handleTypeSelect = (type: 'client' | 'vet') => {
     setUserType(type);
