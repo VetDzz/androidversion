@@ -62,7 +62,7 @@ public class MainActivity extends BridgeActivity {
                 Log.d(TAG, "Query: " + query);
                 
                 // Wait longer for WebView to be fully ready
-                new Handler(Looper.getMainLooper()).postDelayed(() => {
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
                     try {
                         WebView webView = getBridge().getWebView();
                         if (webView != null) {
