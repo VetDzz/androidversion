@@ -11,6 +11,10 @@ const config: CapacitorConfig = {
   },
   // Server configuration
   server: {
+    // DEVELOPMENT MODE: Uncomment these lines and add your PC's IP
+    // url: 'http://192.168.1.100:5173', // Replace with YOUR PC's IP
+    // cleartext: true,
+    
     androidScheme: 'https',
     // Allow navigation to OAuth providers
     allowNavigation: [
@@ -19,6 +23,7 @@ const config: CapacitorConfig = {
       'https://www.facebook.com/*',
       'https://m.facebook.com/*',
       'https://vetdz.netlify.app/*',
+      'http://192.168.1.100:5173/*', // Add your PC's IP here too
     ],
   },
   android: {

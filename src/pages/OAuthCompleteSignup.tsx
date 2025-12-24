@@ -21,17 +21,55 @@ const OAuthCompleteSignup = () => {
   const [userData, setUserData] = useState<any>(null);
 
   useEffect(() => {
-    // Check if user is authenticated and get their data
+    // Check if user is authenticated and has profile already
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         navigate('/auth');
         return;
       }
+      
+      // Check if user already has a profile using the SECURITY DEFINER function
+      console.log('🔍 Checking if user has profile...');
+      const { data: profileInfo, error: profileError } = await supabase
+        .rpc('get_user_profile_info', { check_user_id: user.id });
+      
+      console.log('📊 Profile check result:', profileInfo, profileError);
+      
+      if (!profileError && profileInfo && profileInfo.length > 0) {
+        const profile = profileInfo[0];
+        
+        if (profile.has_profile) {
+          // User already has profile - redirect to dashboard
+          console.log('✅ User already has profile:', profile.user_type);
+          const userType = profile.user_type;
+          
+          // Update cache
+          localStorage.setItem(`userType_${user.id}`, userType);
+          localStorage.setItem(`userTypeTime_${user.id}`, Date.now().toString());
+          
+          toast({
+            title: "Compte existant",
+            description: "Bienvenue de retour !",
+          });
+          
+          // Redirect to dashboard
+          setTimeout(() => {
+            if (userType === 'vet') {
+              window.location.href = '/#/vet-dashboard';
+            } else {
+              window.location.href = '/#/client-dashboard';
+            }
+          }, 500);
+          return;
+        }
+      }
+      
+      // No profile - continue with role selection
       setUserData(user);
     };
     checkUser();
-  }, [navigate]);
+  }, [navigate, toast]);
 
   const handleTypeSelect = (type: 'client' | 'vet') => {
     setUserType(type);
