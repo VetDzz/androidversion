@@ -66,56 +66,58 @@ const AuthCallback = () => {
         const userId = data.session.user.id;
         console.log('👤 User ID:', userId);
         
-        // Use the SECURITY DEFINER function that ALWAYS works
+        // Check cache first for instant redirect
+        const cachedType = localStorage.getItem(`userType_${userId}`);
+        if (cachedType === 'vet' || cachedType === 'client') {
+          console.log('⚡ Using cached type, redirecting immediately');
+          setStatus('success');
+          setTimeout(() => {
+            window.location.href = cachedType === 'vet' ? '/#/vet-dashboard' : '/#/client-dashboard';
+          }, 200);
+          return;
+        }
+        
+        // Try the RPC function with 3 second timeout
         console.log('📡 Calling get_user_profile_info...');
-        const { data: profileInfo, error: profileError } = await supabase
-          .rpc('get_user_profile_info', { check_user_id: userId });
         
-        console.log('📊 Profile info:', profileInfo, 'Error:', profileError);
+        const rpcPromise = supabase.rpc('get_user_profile_info', { check_user_id: userId });
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 3000));
         
-        if (profileError) {
-          console.error('❌ RPC error:', profileError);
-          // If RPC fails, redirect to role selection
-          setStatus('success');
-          setTimeout(() => {
-            window.location.href = '/#/oauth-complete';
-          }, 200);
-          return;
-        }
+        const result = await Promise.race([rpcPromise, timeoutPromise]);
         
-        // Check if user has profile
-        const profile = profileInfo?.[0];
-        
-        if (!profile || !profile.has_profile) {
-          // No profile - redirect to role selection
-          console.log('➡️ No profile, going to role selection');
-          setStatus('success');
-          setTimeout(() => {
-            window.location.href = '/#/oauth-complete';
-          }, 200);
-          return;
-        }
-        
-        // User has profile - cache it and redirect
-        const userType = profile.user_type;
-        console.log('✅ User type:', userType);
-        
-        localStorage.setItem(`userType_${userId}`, userType);
-        localStorage.setItem(`userTypeTime_${userId}`, Date.now().toString());
-        
-        setStatus('success');
-        toast({
-          title: "Connexion réussie",
-          description: "Bienvenue sur VetDZ !",
-        });
-        
-        setTimeout(() => {
-          if (userType === 'vet') {
-            window.location.href = '/#/vet-dashboard';
-          } else {
-            window.location.href = '/#/client-dashboard';
+        if (result && result.data) {
+          const profileInfo = result.data;
+          console.log('📊 Profile info:', profileInfo);
+          
+          const profile = profileInfo?.[0];
+          
+          if (profile && profile.has_profile) {
+            // User has profile - cache and redirect
+            const userType = profile.user_type;
+            console.log('✅ User type:', userType);
+            
+            localStorage.setItem(`userType_${userId}`, userType);
+            localStorage.setItem(`userTypeTime_${userId}`, Date.now().toString());
+            
+            setStatus('success');
+            toast({
+              title: "Connexion réussie",
+              description: "Bienvenue sur VetDZ !",
+            });
+            
+            setTimeout(() => {
+              window.location.href = userType === 'vet' ? '/#/vet-dashboard' : '/#/client-dashboard';
+            }, 300);
+            return;
           }
-        }, 300);
+        }
+        
+        // RPC failed or timed out or no profile - redirect to role selection
+        console.log('⚠️ RPC failed/timeout or no profile, going to role selection');
+        setStatus('success');
+        setTimeout(() => {
+          window.location.href = '/#/oauth-complete';
+        }, 200);
         
       } catch (error: any) {
         console.error('❌ Error:', error);
