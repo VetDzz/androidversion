@@ -58,8 +58,11 @@ public class MainActivity extends BridgeActivity {
                 String fragment = data.getFragment();
                 String query = data.getQuery();
                 
+                Log.d(TAG, "Fragment: " + fragment);
+                Log.d(TAG, "Query: " + query);
+                
                 // Wait longer for WebView to be fully ready
-                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                new Handler(Looper.getMainLooper()).postDelayed(() => {
                     try {
                         WebView webView = getBridge().getWebView();
                         if (webView != null) {
@@ -68,21 +71,27 @@ public class MainActivity extends BridgeActivity {
                             if (fragment != null && fragment.contains("access_token")) {
                                 // Implicit flow - has access_token in fragment
                                 targetUrl = "/#/auth/callback#" + fragment;
+                                Log.d(TAG, "Using fragment with access_token");
                             } else if (query != null && query.contains("access_token")) {
                                 // Access token in query
                                 targetUrl = "/#/auth/callback#" + query.replace("&", "&");
+                                Log.d(TAG, "Using query with access_token");
                             } else if (query != null && query.contains("code=")) {
                                 // PKCE flow - has code in query
                                 targetUrl = "/#/auth/callback?" + query;
+                                Log.d(TAG, "Using PKCE code");
                             } else if (query != null) {
                                 // Other query params
                                 targetUrl = "/#/auth/callback?" + query;
+                                Log.d(TAG, "Using query params");
                             } else if (fragment != null) {
                                 // Other fragment
                                 targetUrl = "/#/auth/callback#" + fragment;
+                                Log.d(TAG, "Using fragment");
                             } else {
-                                // Fallback
-                                targetUrl = "/#/auth/callback";
+                                // Fallback - go to home and let SmartHome handle routing
+                                targetUrl = "/#/";
+                                Log.d(TAG, "No params, going to home");
                             }
                             
                             Log.d(TAG, "Navigating to: " + targetUrl);
@@ -92,7 +101,7 @@ public class MainActivity extends BridgeActivity {
                     } catch (Exception e) {
                         Log.e(TAG, "Error processing OAuth callback", e);
                     }
-                }, 1000);
+                }, 1500); // Increased delay to 1.5s
                 return;
             }
             
