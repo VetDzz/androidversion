@@ -71,84 +71,19 @@ const AuthCallback = () => {
         if (!isMounted) return;
 
         const supabaseUser = data.session.user;
-        const provider = supabaseUser.app_metadata?.provider;
-        const isOAuthLogin = provider === 'google' || provider === 'facebook';
+        console.log('👤 User logged in:', supabaseUser.id);
         
-        console.log('👤 User:', supabaseUser.id, 'Provider:', provider);
-        
-        // Check cache first for instant redirect
-        const cachedType = localStorage.getItem(`userType_${supabaseUser.id}`);
-        const cacheTime = localStorage.getItem(`userTypeTime_${supabaseUser.id}`);
-        const oneHour = 60 * 60 * 1000;
-        
-        if (cachedType && cacheTime && (Date.now() - parseInt(cacheTime)) < oneHour) {
-          console.log('⚡ Using cached user type:', cachedType);
-          setStatus('success');
-          toast({
-            title: "Connexion réussie",
-            description: "Bienvenue sur VetDZ !",
-          });
-          setTimeout(() => {
-            window.location.href = cachedType === 'vet' ? '/#/vet-dashboard' : '/#/client-dashboard';
-          }, 300);
-          return;
-        }
-        
-        // Fast parallel profile check with 5 second timeout
-        let hasClientProfile = false;
-        let hasVetProfile = false;
-        
-        const profileCheckPromise = Promise.all([
-          supabase.from('client_profiles').select('user_id').eq('user_id', supabaseUser.id).maybeSingle(),
-          supabase.from('vet_profiles').select('user_id').eq('user_id', supabaseUser.id).maybeSingle()
-        ]);
-        
-        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
-        
-        const result = await Promise.race([profileCheckPromise, timeoutPromise]);
-        
-        if (result && Array.isArray(result)) {
-          const [clientResult, vetResult] = result;
-          hasClientProfile = !!clientResult.data;
-          hasVetProfile = !!vetResult.data;
-          console.log('📊 Profile check:', { hasClientProfile, hasVetProfile });
-          
-          // Update cache
-          if (hasVetProfile) {
-            localStorage.setItem(`userType_${supabaseUser.id}`, 'vet');
-            localStorage.setItem(`userTypeTime_${supabaseUser.id}`, Date.now().toString());
-          } else if (hasClientProfile) {
-            localStorage.setItem(`userType_${supabaseUser.id}`, 'client');
-            localStorage.setItem(`userTypeTime_${supabaseUser.id}`, Date.now().toString());
-          }
-        } else {
-          console.log('⏱️ Profile check timed out, redirecting to role selection');
-        }
-        
-        // If no profile found, redirect to complete signup
-        if (!hasClientProfile && !hasVetProfile) {
-          setStatus('success');
-          console.log('➡️ No profile, redirecting to oauth-complete');
-          setTimeout(() => {
-            window.location.href = '/#/oauth-complete';
-          }, 200);
-          return;
-        }
-
-        // User has profile - redirect to dashboard
+        // FAST PATH: Just redirect to home and let SmartHome handle routing
+        // This avoids slow database queries during OAuth callback
         setStatus('success');
         toast({
-          title: isOAuthLogin ? "Connexion réussie" : "Email confirmé",
+          title: "Connexion réussie",
           description: "Bienvenue sur VetDZ !",
         });
         
-        console.log('➡️ Redirecting to dashboard');
+        console.log('➡️ Redirecting to home (SmartHome will route correctly)');
         setTimeout(() => {
-          if (hasVetProfile) {
-            window.location.href = '/#/vet-dashboard';
-          } else {
-            window.location.href = '/#/client-dashboard';
-          }
+          window.location.href = '/#/';
         }, 300);
         
       } catch (error: any) {
