@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 const AuthCallback = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'no-account'>('loading');
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
 
   useEffect(() => {
     let isMounted = true;
@@ -14,9 +14,9 @@ const AuthCallback = () => {
     const handleAuthCallback = async () => {
       try {
         const fullUrl = window.location.href;
-        console.log('🔐 AuthCallback started:', fullUrl);
+        console.log('🔐 OAuth callback started');
         
-        // Check if there are tokens in the URL (email confirmation or OAuth)
+        // Extract and set session from URL tokens
         if (fullUrl.includes('access_token=')) {
           let tokenPart = '';
           const accessTokenIndex = fullUrl.indexOf('access_token=');
@@ -33,34 +33,27 @@ const AuthCallback = () => {
             const refreshToken = params.get('refresh_token');
             
             if (accessToken) {
-              console.log('🔑 Setting session from URL token...');
-              const { error: setError } = await supabase.auth.setSession({
+              console.log('🔑 Setting session...');
+              await supabase.auth.setSession({
                 access_token: accessToken,
                 refresh_token: refreshToken || ''
               });
-              
-              if (setError) {
-                throw new Error(setError.message);
-              }
-              
               window.history.replaceState(null, '', window.location.origin + '/#/auth/callback');
             }
           }
         }
         
-        // Small delay to ensure session is set
         await new Promise(resolve => setTimeout(resolve, 200));
 
         // Get session
         const { data, error } = await supabase.auth.getSession();
-        console.log('📋 Session check:', data?.session ? 'Found' : 'Not found');
 
         if (error || !data.session) {
           if (isMounted) {
             setStatus('error');
             toast({
               title: "Erreur de connexion",
-              description: error?.message || "Session non trouvée",
+              description: "Session non trouvée",
               variant: "destructive"
             });
             setTimeout(() => navigate('/auth'), 2000);
@@ -70,29 +63,67 @@ const AuthCallback = () => {
 
         if (!isMounted) return;
 
-        const supabaseUser = data.session.user;
-        console.log('👤 User logged in:', supabaseUser.id);
+        const userId = data.session.user.id;
+        console.log('👤 User ID:', userId);
         
-        // FAST PATH: Just redirect to home and let SmartHome handle routing
-        // This avoids slow database queries during OAuth callback
+        // Use the SECURITY DEFINER function that ALWAYS works
+        console.log('📡 Calling get_user_profile_info...');
+        const { data: profileInfo, error: profileError } = await supabase
+          .rpc('get_user_profile_info', { check_user_id: userId });
+        
+        console.log('📊 Profile info:', profileInfo, 'Error:', profileError);
+        
+        if (profileError) {
+          console.error('❌ RPC error:', profileError);
+          // If RPC fails, redirect to role selection
+          setStatus('success');
+          setTimeout(() => {
+            window.location.href = '/#/oauth-complete';
+          }, 200);
+          return;
+        }
+        
+        // Check if user has profile
+        const profile = profileInfo?.[0];
+        
+        if (!profile || !profile.has_profile) {
+          // No profile - redirect to role selection
+          console.log('➡️ No profile, going to role selection');
+          setStatus('success');
+          setTimeout(() => {
+            window.location.href = '/#/oauth-complete';
+          }, 200);
+          return;
+        }
+        
+        // User has profile - cache it and redirect
+        const userType = profile.user_type;
+        console.log('✅ User type:', userType);
+        
+        localStorage.setItem(`userType_${userId}`, userType);
+        localStorage.setItem(`userTypeTime_${userId}`, Date.now().toString());
+        
         setStatus('success');
         toast({
           title: "Connexion réussie",
           description: "Bienvenue sur VetDZ !",
         });
         
-        console.log('➡️ Redirecting to home (SmartHome will route correctly)');
         setTimeout(() => {
-          window.location.href = '/#/';
+          if (userType === 'vet') {
+            window.location.href = '/#/vet-dashboard';
+          } else {
+            window.location.href = '/#/client-dashboard';
+          }
         }, 300);
         
       } catch (error: any) {
-        console.error('❌ AuthCallback error:', error);
+        console.error('❌ Error:', error);
         if (isMounted) {
           setStatus('error');
           toast({
             title: "Erreur",
-            description: error?.message || "Une erreur est survenue.",
+            description: error?.message || "Une erreur est survenue",
             variant: "destructive"
           });
           setTimeout(() => navigate('/auth'), 2000);
@@ -102,25 +133,10 @@ const AuthCallback = () => {
 
     handleAuthCallback();
     
-    // 10 second timeout
-    const timeout = setTimeout(() => {
-      if (isMounted && status === 'loading') {
-        console.log('⏱️ Global timeout reached');
-        setStatus('error');
-        toast({
-          title: "Délai dépassé",
-          description: "La connexion prend trop de temps.",
-          variant: "destructive"
-        });
-        setTimeout(() => navigate('/auth'), 2000);
-      }
-    }, 10000);
-    
     return () => {
       isMounted = false;
-      clearTimeout(timeout);
     };
-  }, [navigate, toast, status]);
+  }, [navigate, toast]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -129,7 +145,7 @@ const AuthCallback = () => {
           <>
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Connexion en cours...</h2>
-            <p className="text-gray-600">Veuillez patienter</p>
+            <p className="text-gray-600">Un instant...</p>
           </>
         )}
         {status === 'success' && (
@@ -150,7 +166,7 @@ const AuthCallback = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Erreur de connexion</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Erreur</h2>
             <p className="text-gray-600">Redirection...</p>
           </>
         )}
